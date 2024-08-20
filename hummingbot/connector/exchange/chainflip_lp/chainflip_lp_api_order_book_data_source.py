@@ -42,11 +42,11 @@ class ChainflipLpAPIOrderBookDataSource(OrderBookTrackerDataSource):
         raise NotImplementedError
 
     async def _connected_websocket_assistant(self) -> WSAssistant:
-        pass
+        raise NotImplementedError
 
     async def _subscribe_channels(self, ws: WSAssistant):
         """
         Subscribe to the trades and order diffs
         """
         # subscriptions to trades and order diffs does not exist in chainflip lp
-        pass
+        raise NotImplementedError
