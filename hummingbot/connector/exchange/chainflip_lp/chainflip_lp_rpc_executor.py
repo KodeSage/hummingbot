@@ -107,12 +107,10 @@ class RPCQueryExecutor(BaseRPCExecutor):
         self._chain_config = chain_config
 
     async def start(self):
-        self.logger().info(f"Starting up! API URL: {self._lp_api_url} RPC URL: {self._rpc_url}")
         self._lp_api_instance = self._start_instance(self._lp_api_url)
         self._rpc_instance = self._start_instance(self._rpc_url)
 
     async def check_connection_status(self):
-        self.logger().info("Checking connection status")
         response = await self._execute_rpc_request(CONSTANTS.SUPPORTED_ASSETS_METHOD)
         api_response = await self._execute_api_request(CONSTANTS.ASSET_BALANCE_METHOD)
 
@@ -122,7 +120,6 @@ class RPCQueryExecutor(BaseRPCExecutor):
         return response["status"] and api_response["status"]
 
     async def all_assets(self):
-        self.logger().info("Fetching all_assets")
         response = await self._execute_rpc_request(CONSTANTS.SUPPORTED_ASSETS_METHOD)
 
         if not response["status"]:
@@ -131,7 +128,6 @@ class RPCQueryExecutor(BaseRPCExecutor):
         return DataFormatter.format_all_assets_response(response["data"], chain_config=self._chain_config)
 
     async def all_markets(self):
-        self.logger().info("Fetching all_markets")
         response = await self._execute_rpc_request(CONSTANTS.ACTIVE_POOLS_METHOD)
 
         if not response["status"]:
@@ -148,17 +144,15 @@ class RPCQueryExecutor(BaseRPCExecutor):
             "asset":str
         }
         """
-        self.logger().info("Fetching get_orderbook")
         params = {"base_asset": base_asset, "quote_asset": quote_asset, "orders": orders}
         response = await self._execute_rpc_request(CONSTANTS.POOL_ORDERBOOK_METHOD, params)
 
         if not response["status"]:
             return None
 
-        return DataFormatter.format_orderbook_response(response["data"])
+        return DataFormatter.format_orderbook_response(response["data"], base_asset, quote_asset)
 
     async def get_open_orders(self, base_asset: Dict[str, str], quote_asset: Dict[str, str]):
-        self.logger().info("Fetching get_open_orders")
         params = {"base_asset": base_asset, "quote_asset": quote_asset, "lp": self._lp_account_address}
         response = await self._execute_rpc_request(CONSTANTS.OPEN_ORDERS_METHOD, params)
 
@@ -168,7 +162,6 @@ class RPCQueryExecutor(BaseRPCExecutor):
         return DataFormatter.format_order_response(response["data"], base_asset, quote_asset)
 
     async def get_all_balances(self):
-        self.logger().info("Fetching get_all_balances")
         response = await self._execute_api_request(CONSTANTS.ASSET_BALANCE_METHOD)
 
         if not response["status"]:
@@ -177,7 +170,6 @@ class RPCQueryExecutor(BaseRPCExecutor):
         return DataFormatter.format_balance_response(response["data"])
 
     async def get_market_price(self, base_asset: Dict[str, str], quote_asset: Dict[str, str]):
-        self.logger().info("Fetching get_market_price")
         params = {"base_asset": base_asset, "quote_asset": quote_asset}
         response = await self._execute_rpc_request(CONSTANTS.MARKET_PRICE_V2_METHOD, params)
 
@@ -208,9 +200,11 @@ class RPCQueryExecutor(BaseRPCExecutor):
             "side": side,
             "tick": tick,
             "sell_amount": amount,
+            "wait_for": "InBlock"
         }
         response = await self._execute_api_request(CONSTANTS.PLACE_LIMIT_ORDER_METHOD, params)
         if not response["status"]:
+            self.logger().error("Could not place order")
             return False
         return DataFormatter.format_place_order_response(response["data"])
 
@@ -227,6 +221,7 @@ class RPCQueryExecutor(BaseRPCExecutor):
             "id": order_id,
             "side": side,
             "sell_amount": DataFormatter.format_amount(0, base_asset),
+            "wait_for": "InBlock"
         }
         response = await self._execute_api_request(CONSTANTS.CANCEL_LIMIT_ORDER, params)
         return response["status"]
@@ -272,7 +267,7 @@ class RPCQueryExecutor(BaseRPCExecutor):
         await self._subscribe_to_api_event(CONSTANTS.ORDER_FILLS_SUBSCRIPTION_METHOD, handler)
 
     def _start_instance(self, url):
-        self.logger().info(f"Start instance {url}")
+        self.logger().debug(f"Start instance {url}")
 
         try:
             instance = SubstrateInterface(url=url, auto_discover=False)
@@ -306,11 +301,9 @@ class RPCQueryExecutor(BaseRPCExecutor):
 
         async with self._throttler.execute_task(throttler_limit_id):
             response_data = {"status": True, "data": {}}
-            response = None  # for testing purposes
-
+            self.logger().debug("Calling " + request_method)
             while True:
                 try:
-                    self.logger().debug("Calling " + request_method)
                     response = await self.run_in_thread(
                         self._lp_api_instance.rpc_request, method=request_method, params=params
                     )
@@ -332,7 +325,6 @@ class RPCQueryExecutor(BaseRPCExecutor):
                     response_data["data"] = {"code": 0, "message": "An Error Occurred"}
                     break
 
-            self.logger().debug(request_method + " API call response:" + str(response_data["data"]))
             return response_data
 
     async def _execute_rpc_request(
@@ -343,16 +335,13 @@ class RPCQueryExecutor(BaseRPCExecutor):
         if not self._rpc_instance:
             self._rpc_instance = self._start_instance(self._rpc_url)
         response_data = {"status": True, "data": {}}
-        response = None  # for testing purposes
         async with self._throttler.execute_task(throttler_limit_id):
             while True:
                 try:
-                    self.logger().debug("Calling " + request_method)
                     response = await self.run_in_thread(
                         self._rpc_instance.rpc_request, method=request_method, params=params
                     )
                     response_data["data"] = response
-                    self.logger().info(f"Calling {request_method} response: {response}")
                     break
 
                 except ssl.SSLEOFError:

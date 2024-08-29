@@ -22,17 +22,9 @@ class DataFormatter:
 
     @classmethod
     def format_hex_balance(cls, balance: str, asset: Dict[str, str]):
-        cls.logger().debug(f"Converting {balance} as {asset}")
-
         int_balance = cls.hex_str_to_int(balance)
-        cls.logger().debug(f"Balance for {balance} as {int_balance}")
-
         precision = cls.format_asset_precision(asset)
-        cls.logger().debug(f"Precision for {balance} is {precision}")
-
         value = int_balance / precision
-        cls.logger().debug(f"Converted value is {value}")
-
         return value
 
     @classmethod
@@ -87,19 +79,16 @@ class DataFormatter:
     @classmethod
     def format_balance_response(cls, response):
         data = response["result"]
-        cls.logger().info(f"Mapping {data} as balance")
 
         chains = data.keys()
 
         balance_map = {}
         for chain in chains:
             assets = data[chain].keys()
-
             for asset in assets:
                 token = f"{asset}-{chain}"
-                cls.logger().info("Mapping " + token)
-
                 balance_map[token] = cls.format_hex_balance(data[chain][asset], {"chain": chain, "asset": asset})
+
         return balance_map
 
     @classmethod
@@ -274,12 +263,10 @@ class DataFormatter:
         # filter the fills to return only limit orders
         limit_orders_fills = list(filter(lambda x: x[0] == "limit_orders", fills.items()))
         if not limit_orders_fills:
-            cls.logger().info("No Limit Order fills found")
             return []
         # filter the limit orders fill by the user address
         user_orders = list(filter(lambda x: x[1]["lp"] == address, limit_orders_fills))
         if not user_orders:
-            cls.logger().info("No order fill found for current address")
             return []
         # get the values of the
         main_data = list(map(lambda x: x[1], user_orders))
