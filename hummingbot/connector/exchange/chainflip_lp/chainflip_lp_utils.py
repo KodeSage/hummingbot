@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from pydantic import Field, SecretStr, validator
+from pydantic import Field, validator
 
 from hummingbot.client.config.config_data_types import BaseConnectorConfigMap, ClientFieldData
 from hummingbot.client.config.config_validators import validate_with_regex
@@ -30,7 +30,7 @@ class ChainflipLpConfigMap(BaseConnectorConfigMap):
             prompt_on_new=True,
         ),
     )
-    chainflip_lp_address: SecretStr = Field(
+    chainflip_lp_address: str = Field(
         default=...,
         client_data=ClientFieldData(
             prompt=lambda cm: "Enter your Chainflip LP Address",
@@ -104,7 +104,7 @@ class ChainflipLpTestnetConfigMap(BaseConnectorConfigMap):
             prompt_on_new=True,
         ),
     )
-    chainflip_lp_address: SecretStr = Field(
+    chainflip_lp_address: str = Field(
         default=...,
         client_data=ClientFieldData(
             prompt=lambda cm: "Enter your Chainflip LP Address",

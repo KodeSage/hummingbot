@@ -1,4 +1,5 @@
 import logging
+from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 from hummingbot.connector.exchange.chainflip_lp import chainflip_lp_constants as CONSTANTS
@@ -77,7 +78,7 @@ class DataFormatter:
         return {"asks": asks, "bids": bids}
 
     @classmethod
-    def format_balance_response(cls, response):
+    def format_balance_response(cls, response, chain_config: dict = CONSTANTS.DEFAULT_CHAIN_CONFIG):
         data = response["result"]
 
         chains = data.keys()
@@ -86,8 +87,11 @@ class DataFormatter:
         for chain in chains:
             assets = data[chain].keys()
             for asset in assets:
-                token = f"{asset}-{chain}"
-                balance_map[token] = cls.format_hex_balance(data[chain][asset], {"chain": chain, "asset": asset})
+                if asset in chain_config:
+                    if chain_config[asset] != chain:
+                        continue  # skip asset balance
+                token = f"{asset}"
+                balance_map[token] = Decimal(cls.format_hex_balance(data[chain][asset], {"chain": chain, "asset": asset}))
 
         return balance_map
 
@@ -260,6 +264,8 @@ class DataFormatter:
 
         data = response["result"]
         fills: Dict = data["fills"]
+        if len(fills) == 0:
+            return []
         # filter the fills to return only limit orders
         limit_orders_fills = list(filter(lambda x: x[0] == "limit_orders", fills.items()))
         if not limit_orders_fills:
@@ -268,7 +274,6 @@ class DataFormatter:
         user_orders = list(filter(lambda x: x[1]["lp"] == address, limit_orders_fills))
         if not user_orders:
             return []
-        # get the values of the
         main_data = list(map(lambda x: x[1], user_orders))
         formatted_data = list(map(format_single_order_fill, main_data))
         return formatted_data
@@ -290,3 +295,40 @@ class DataFormatter:
         raw_price = 1.0001**tick
         price = (raw_price * base_precision) / quote_precision
         return price
+
+    @classmethod
+    def convert_bot_id_to_int(cls, id: str):
+        """
+        The reason for this method is because chainflip only accepts numeric id
+        and hummingbot generates a string id.
+        so we will be converting the string to integer.
+        in the exchange file, the string id has already been
+        converted to a hex format in the buy and sell
+        method which will make it easier to be converting to integerr
+        """
+        # convert the hex str to integer.
+        integer = cls.hex_str_to_int(id)
+        # convert the integer to string reduce the length
+        # the length might be too much to pass as an id
+        string_int = str(integer)[:10]
+        new_id = int(string_int)
+        return new_id
+
+    @classmethod
+    def format_order_status(cls, response: dict, id: str, side: str):
+        result = response["result"]
+        limit_orders = result["limit_orders"]
+        if side == CONSTANTS.SIDE_SELL:
+            data = limit_orders["asks"]
+        else:
+            data = limit_orders["bids"]
+        if len(data) == 0:
+            return None  # no more open orders
+        order = list(filter(
+            lambda x: x["id"] == id,
+            data
+        ))
+        if len(order) == 0:
+            return None
+        else:
+            return order[0]

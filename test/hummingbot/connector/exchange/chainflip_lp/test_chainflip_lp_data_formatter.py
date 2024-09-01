@@ -1,3 +1,4 @@
+from decimal import Decimal
 from unittest import TestCase
 
 from hummingbot.connector.exchange.chainflip_lp.chainflip_lp_data_formatter import DataFormatter
@@ -83,7 +84,7 @@ class DataFormatterTests(TestCase):
         balances = DataFormatter.format_balance_response(response)
         self.assertEqual(type(balances), dict)
         self.assertEqual(len(balances), 3)
-        self.assertEqual(type(balances[f"{self.base_asset_dict['asset']}-{self.base_asset_dict['chain']}"]), float)
+        self.assertEqual(type(balances[f"{self.base_asset_dict['asset']}"]), Decimal)
 
     def test_format_all_market_response(self):
         response = {
@@ -273,3 +274,39 @@ class DataFormatterTests(TestCase):
         order_data = DataFormatter.format_place_order_response(response)
         self.assertTrue(isinstance(order_data, dict))
         self.assertIn("order_id", order_data)
+
+    def test_format_order_status(self):
+        response_data = {
+            "result": {
+                "limit_orders": {
+                    "asks": [
+                        {
+                            "lp": "cFLGvPhhrribWCx9id5kLVqwiFK4QiVNjQ6ViyaRFF2Nrgq7j",  # noqa: mock
+                            "id": "0x0",  # noqa: mock
+                            "tick": -195623,
+                            "sell_amount": "0x56d3a03776ce8ba0",  # noqa: mock
+                            "fees_earned": "0x0",  # noqa: mock
+                            "original_sell_amount": "0x56d3a03776ce8ba0"  # noqa: mock
+                        },
+                    ],
+                    "bids": [
+                        {
+                            "lp": "cFLGvPhhrribWCx9id5kLVqwiFK4QiVNjQ6ViyaRFF2Nrgq7j",  # noqa: mock
+                            "id": "0x0",  # noqa: mock
+                            "tick": -195622,
+                            "sell_amount": "0x4a817c800",  # noqa: mock
+                            "fees_earned": "0x0",  # noqa: mock
+                            "original_sell_amount": "0x4a817c800"  # noqa: mock
+                        },
+                    ]
+                },
+            }
+        }
+        status = DataFormatter.format_order_status(
+            response_data,
+            "0x0",  # noqa: mock
+            "sell"
+        )
+
+        self.assertIsNotNone(status)
+        self.assertIsInstance(status, dict)

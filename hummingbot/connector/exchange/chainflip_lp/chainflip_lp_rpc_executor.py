@@ -1,17 +1,16 @@
 import asyncio
-import json
 import logging
 import math
 import ssl
 import sys
 from abc import ABC, abstractmethod
+from decimal import Decimal
 from functools import partial
 from typing import Any, Callable, Dict, List, Literal, Optional
 
 from requests.exceptions import ConnectionError
 from substrateinterface import SubstrateInterface
 from substrateinterface.exceptions import SubstrateRequestException
-from websockets import connect as websockets_connect
 
 from hummingbot.connector.exchange.chainflip_lp import chainflip_lp_constants as CONSTANTS
 from hummingbot.connector.exchange.chainflip_lp.chainflip_lp_data_formatter import DataFormatter
@@ -161,13 +160,26 @@ class RPCQueryExecutor(BaseRPCExecutor):
 
         return DataFormatter.format_order_response(response["data"], base_asset, quote_asset)
 
+    async def get_order_status(self, id: str, side: str, base_asset: Dict[str, str], quote_asset: Dict[str, str]):
+        params = {
+            "base_asset": base_asset,
+            "quote_asset": quote_asset,
+            "lp": self._lp_account_address
+        }
+        self.logger().info(f"params: {params}")
+        response = await self._execute_rpc_request(CONSTANTS.OPEN_ORDERS_METHOD, params)
+        if not response["status"]:
+            raise RuntimeError(f"Error getting order status: {response['data']}")
+
+        return DataFormatter.format_order_status(response["data"], id, side)
+
     async def get_all_balances(self):
         response = await self._execute_api_request(CONSTANTS.ASSET_BALANCE_METHOD)
 
         if not response["status"]:
             return []
 
-        return DataFormatter.format_balance_response(response["data"])
+        return DataFormatter.format_balance_response(response["data"], self._chain_config)
 
     async def get_market_price(self, base_asset: Dict[str, str], quote_asset: Dict[str, str]):
         params = {"base_asset": base_asset, "quote_asset": quote_asset}
@@ -184,19 +196,20 @@ class RPCQueryExecutor(BaseRPCExecutor):
         base_asset: Dict[str, str],
         quote_asset: Dict[str, str],
         order_id: str,
-        order_price: float,
+        order_price: Decimal,
         side: Literal["buy"] | Literal["sell"],
-        sell_amount: int,
+        sell_amount: Decimal,
     ):
-        tick = self._calculate_tick(order_price, base_asset, quote_asset)
+        tick = self._calculate_tick(float(order_price), base_asset, quote_asset)
         if side == CONSTANTS.SIDE_BUY:
-            amount = DataFormatter.format_amount(sell_amount, quote_asset)
+            amount = DataFormatter.format_amount(float(sell_amount), quote_asset)
         else:
-            amount = DataFormatter.format_amount(sell_amount, base_asset)
+            amount = DataFormatter.format_amount(float(sell_amount), base_asset)
+        converted_id = DataFormatter.convert_bot_id_to_int(order_id)
         params = {
-            "base_asset": base_asset["asset"],
-            "quote_asset": quote_asset["asset"],
-            "id": order_id,
+            "base_asset": base_asset,
+            "quote_asset": quote_asset,
+            "id": converted_id,
             "side": side,
             "tick": tick,
             "sell_amount": amount,
@@ -215,10 +228,11 @@ class RPCQueryExecutor(BaseRPCExecutor):
         order_id: str,
         side: Literal["buy"] | Literal["sell"],
     ) -> bool:
+        converted_id = DataFormatter.convert_bot_id_to_int(order_id)
         params = {
-            "base_asset": base_asset["asset"],
-            "quote_asset": quote_asset["asset"],
-            "id": order_id,
+            "base_asset": base_asset,
+            "quote_asset": quote_asset,
+            "id": converted_id,
             "side": side,
             "sell_amount": DataFormatter.format_amount(0, base_asset),
             "wait_for": "InBlock"
@@ -377,30 +391,6 @@ class RPCQueryExecutor(BaseRPCExecutor):
                 )
                 instance.close()
                 sys.exit()
-
-    async def _subscribe_to_rpc_event(
-        self,
-        method_name: str,
-        handler: Callable,
-        params: List = [],
-    ):
-        url = self._get_current_rpc_ws_url(self._domain)
-        async with websockets_connect(url) as websocket:
-            request = json.dumps({"jsonrpc": "2.0", "id": 1, "method": method_name, "params": params})
-            await websocket.send(request)
-            while True:
-                try:
-                    response = await websocket.recv()
-                    data = json.loads(response)
-                    handler(data)
-                except asyncio.CancelledError:
-                    raise
-                except Exception as e:
-                    self.logger().error(
-                        f"Unexpected error listening to subscription event from Chainflip LP RPC. Error: {e}",
-                        exc_info=True,
-                    )
-                    break
 
     def _calculate_tick(self, price: float, base_asset: Dict[str, str], quote_asset: Dict[str, str]):
         """
