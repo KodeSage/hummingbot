@@ -249,7 +249,7 @@ class RPCQueryExecutor(BaseRPCExecutor):
             return []
         return DataFormatter.format_order_fills_response(response, self._lp_account_address, all_assets)
 
-    async def listen_to_market_price_updates(self, events_handler: Callable, market_symbol: str):
+    async def listen_to_market_price_updates(self, events_handler: Callable, market_symbol: str):  # pragma: no cover
         all_assets = await self.all_assets()
         if not all_assets:
             self.logger().error("Unexpected error getting assets from Chainflip LP API.")

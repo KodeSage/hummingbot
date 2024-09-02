@@ -24,8 +24,6 @@ class ChainflipLpAPIOrderBookDataSource(OrderBookTrackerDataSource):
         self._connector = connector
         self._data_source = data_source
         self._domain = domain
-        # self._forwarders = []
-        # self._configure_event_forwarders()
 
     async def get_last_traded_prices(self, trading_pairs: List[str], domain: Optional[str] = None) -> Dict[str, float]:
         return await self._connector.get_last_traded_prices(trading_pairs=trading_pairs)
@@ -36,17 +34,17 @@ class ChainflipLpAPIOrderBookDataSource(OrderBookTrackerDataSource):
 
     async def listen_for_subscriptions(self):
         # no supported subscription available to listen to in chainflip lp
-        pass
+        pass  # pragma: no cover
 
     async def _parse_order_book_snapshot_message(self, raw_message: Dict[str, Any], message_queue: asyncio.Queue):
         raise NotImplementedError
 
     async def _connected_websocket_assistant(self) -> WSAssistant:
-        pass
+        pass  # pragma: no cover
 
     async def _subscribe_channels(self, ws: WSAssistant):
         """
         Subscribe to the trades and order diffs
         """
         # subscriptions to trades and order diffs does not exist in chainflip lp
-        pass
+        pass  # pragma: no cover

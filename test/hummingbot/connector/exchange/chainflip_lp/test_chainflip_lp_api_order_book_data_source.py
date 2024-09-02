@@ -178,17 +178,22 @@ class TestChanflipLPAPIOrderBookDataSource(TestCase):
         with self.assertRaises(Exception):
             self.async_run_with_timeout(self.data_source.get_new_order_book(self.trading_pair))
 
-    def test_listen_for_subscriptions_subscribes_to_trades_and_order_diffs(self):
-        pass
-
-    def test_listen_for_subscriptions_raises_cancel_exception(self):
-        pass
-
-    def test_listen_for_subscriptions_logs_exception_details(self):
-        pass
-
-    def test_subscribe_channels_raises_cancel_exception(self):
-        pass
-
-    def test_subscribe_channels_raises_exception_and_logs_error(self):
-        pass
+    def test_get_last_traded_prices(self):
+        response = {
+            "result": {
+                "base_asset": {"chain": "Bitcoin", "asset": "BTC"},
+                "quote_asset": {"chain": "Ethereum", "asset": "USDC"},
+                "sell": "0x10b09273676d13f5d254e20a20",  # noqa: mock
+                "buy": "0x10b09273676d13f5d254e20a20",  # noqa: mock
+                "range_order": "0x10b09273676d13f5d254e20a20",  # noqa: mock
+            }
+        }
+        self.data_source._data_source._rpc_executor._all_assets_responses.put_nowait(self.all_asset_mock_data)
+        self.data_source._data_source._rpc_executor._get_market_price_responses.put_nowait(response)
+        traded_prices = self.async_run_with_timeout(
+            self.data_source.get_last_traded_prices([self.trading_pair])
+        )
+        self.assertIsInstance(traded_prices, dict)
+        self.assertEqual(len(traded_prices), 1)
+        self.assertIn(self.trading_pair, traded_prices)
+        self.assertIsInstance(traded_prices[self.trading_pair], float)
