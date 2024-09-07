@@ -1,6 +1,5 @@
 import asyncio
 import re
-from test.hummingbot.connector.exchange.chainflip_lp.mock_rpc_executor import MockRPCExecutor
 from typing import Awaitable, Optional, Union
 from unittest import TestCase
 
@@ -15,6 +14,7 @@ from hummingbot.connector.exchange.chainflip_lp.chainflip_lp_api_order_book_data
 from hummingbot.connector.exchange.chainflip_lp.chainflip_lp_data_formatter import DataFormatter
 from hummingbot.connector.exchange.chainflip_lp.chainflip_lp_exchange import ChainflipLpExchange
 from hummingbot.connector.test_support.network_mocking_assistant import NetworkMockingAssistant
+from test_bronze.hummingbot.connector.exchange.chainflip_lp.mock_rpc_executor import MockRPCExecutor
 
 
 class TestChanflipLPAPIOrderBookDataSource(TestCase):
